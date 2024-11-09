@@ -7,7 +7,7 @@ _LOGGER = logging.getLogger(__name__)
 
 API_BASE_URL = "https://api.tauron.pl"  # Zaktualizuj ten URL do odpowiedniego
 
-class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron"):
+class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     """Handle a config flow for Tauron."""
     VERSION = 1
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_PUSH
