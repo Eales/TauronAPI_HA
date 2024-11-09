@@ -2,7 +2,6 @@ import aiohttp
 import logging
 from homeassistant import config_entries
 import voluptuous as vol
-from homeassistant.helpers import config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,7 +61,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron"):
         }
 
         return self.async_show_form(
-            step_id="user",
+            step_id="user_selected",
             data_schema=vol.Schema(
                 {
                     vol.Required("selected_city"): vol.In(city_choices),  # Tworzymy pole z listą do wyboru
