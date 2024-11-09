@@ -1,0 +1,10 @@
+{
+    "domain": "tauron_dystrybucja",
+    "name": "Tauron Dystrybucja",
+    "documentation": "https://www.tauron-dystrybucja.pl",
+    "requirements": ["requests"],
+    "dependencies": [],
+    "codeowners": ["@username"],
+    "version": "1.0.0"
+  }
+  
