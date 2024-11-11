@@ -31,20 +31,6 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 _LOGGER.error(f"Error fetching cities: {e}")
                 return []
 
-    async def _fetch_streets(self, street_name, owner_gaid):
-        """Fetch street list from Tauron API asynchronously."""
-        url = f"{API_BASE_URL}/enum/geo/streets?partName={street_name}&ownerGAID={owner_gaid}"
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.get(url) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-                    _LOGGER.debug(f"Fetched streets data: {data}")  # Logowanie odpowiedzi
-                    return data
-            except Exception as e:
-                _LOGGER.error(f"Error fetching streets: {e}")
-                return []
-
     async def async_step_user(self, user_input=None):
         """Handle the initial step of configuring the integration with dynamic suggestions."""
         errors = {}
@@ -68,14 +54,19 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                     errors["city"] = "invalid_city"
 
         data_schema = vol.Schema({
-            vol.Required("city"): str,
+            vol.Required("city"): TextSelector(
+                TextSelectorConfig(
+                    type=TextSelectorType.SEARCH,
+                    placeholder="Wpisz nazwę miasta (minimum 3 znaki)",
+                    autocomplete=True
+                )
+            )
         })
 
         return self.async_show_form(
             step_id="user",
             data_schema=data_schema,
             errors=errors,
-            description_placeholders={"city": "Wpisz nazwę miasta (minimum 3 znaki) i wybierz z sugerowanych opcji."}
         )
 
     @staticmethod
