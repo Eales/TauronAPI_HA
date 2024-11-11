@@ -7,6 +7,8 @@ from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
+# Ustawienie logowania na poziomie DEBUG
+logging.basicConfig(level=logging.DEBUG)
 _LOGGER = logging.getLogger(__name__)
 
 # Poprawiony adres URL do Tauron API
@@ -20,11 +22,11 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     async def _fetch_cities(self, city_name):
         """Fetch city list from Tauron API asynchronously."""
         url = f"{API_BASE_URL}/enum/geo/cities?partName={city_name}"
-        _LOGGER.info(f"Fetching cities with partName: {city_name}")
+        _LOGGER.debug(f"Fetching cities with partName: {city_name}")
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(url) as response:
-                    _LOGGER.info(f"Request URL: {url}, Status: {response.status}")
+                    _LOGGER.debug(f"Request URL: {url}, Status: {response.status}")
                     response.raise_for_status()
                     data = await response.json()
                     _LOGGER.debug(f"Fetched cities data: {data}")  # Logowanie odpowiedzi
@@ -39,7 +41,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
         if user_input is not None:
             city_name = user_input.get("city")
-            _LOGGER.info(f"User input for city: {city_name}")
+            _LOGGER.debug(f"User input for city: {city_name}")
             if len(city_name) < 3:
                 _LOGGER.warning("City name too short, must be at least 3 characters.")
                 errors["city"] = "too_short"
@@ -47,10 +49,10 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 cities = await self._fetch_cities(city_name)
                 if cities:
                     city_suggestions = [city["Name"] for city in cities]
-                    _LOGGER.info(f"City suggestions: {city_suggestions}")
+                    _LOGGER.debug(f"City suggestions: {city_suggestions}")
                     selected_city = next((city for city in cities if city["Name"] == city_name), None)
                     if selected_city:
-                        _LOGGER.info(f"Selected city: {selected_city}")
+                        _LOGGER.debug(f"Selected city: {selected_city}")
                         return self.async_create_entry(
                             title=selected_city["Name"],
                             data={"city": selected_city},
@@ -82,7 +84,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         async def handle_city_suggestions(hass, connection, msg):
             """Handle city suggestions dynamically via websocket."""
             query = msg.get("query")
-            _LOGGER.info(f"WebSocket received query: {query}")
+            _LOGGER.debug(f"WebSocket received query: {query}")
             if len(query) < 3:
                 _LOGGER.warning("Query too short for suggestions, must be at least 3 characters.")
                 connection.send_result(msg["id"], [])
@@ -90,7 +92,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
             cities = await hass.async_add_executor_job(self._fetch_cities, query)
             suggestions = [city["Name"] for city in cities]
-            _LOGGER.info(f"WebSocket suggestions: {suggestions}")
+            _LOGGER.debug(f"WebSocket suggestions: {suggestions}")
             connection.send_result(msg["id"], suggestions)
 
         websocket_api.async_register_command(hass, handle_city_suggestions)
