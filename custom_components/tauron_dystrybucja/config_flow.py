@@ -5,7 +5,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, SelectSelectorMode
+from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +36,6 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     async def async_step_user(self, user_input=None):
         """Handle the initial step of configuring the integration with dynamic suggestions."""
         errors = {}
-        city_suggestions = []
 
         if user_input is not None:
             city_name = user_input.get("city")
@@ -61,13 +60,12 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                     _LOGGER.warning("No valid cities found for the given input.")
                     errors["city"] = "invalid_city"
 
-        _LOGGER.debug(f"City suggestions for form: {city_suggestions}")
         data_schema = vol.Schema({
-            vol.Required("city"): SelectSelector(
-                SelectSelectorConfig(
-                    options=city_suggestions if city_suggestions else [""],
-                    mode=SelectSelectorMode.DROPDOWN,
-                    translation_key="city_selector"
+            vol.Required("city"): TextSelector(
+                TextSelectorConfig(
+                    type=TextSelectorType.SEARCH,
+                    placeholder="Wpisz nazwę miasta (minimum 3 znaki)",
+                    autocomplete=True
                 )
             )
         })
