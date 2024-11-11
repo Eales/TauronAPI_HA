@@ -2,7 +2,9 @@ import aiohttp
 import logging
 from homeassistant import config_entries
 import voluptuous as vol
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, SelectSelectorMode
+from homeassistant.components import websocket_api
+from homeassistant.core import callback
+from homeassistant.helpers import config_validation as cv
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,7 +33,6 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     async def async_step_user(self, user_input=None):
         """Handle the initial step of configuring the integration with dynamic suggestions."""
         errors = {}
-
         if user_input is not None:
             city_name = user_input.get("city")
             if len(city_name) < 3:
@@ -39,7 +40,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
             else:
                 cities = await self._fetch_cities(city_name)
                 if cities:
-                    selected_city_name = user_input.get("selected_city")
+                    selected_city_name = user_input.get("city")
                     city_data = next((city for city in cities if city["Name"] == selected_city_name), None)
                     if city_data:
                         return self.async_create_entry(
@@ -51,43 +52,33 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
         data_schema = vol.Schema({
             vol.Required("city"): str,
-            vol.Optional("selected_city"): SelectSelector(
-                SelectSelectorConfig(
-                    options=[],
-                    mode=SelectSelectorMode.DROPDOWN
-                )
-            )
         })
 
         return self.async_show_form(
             step_id="user",
             data_schema=data_schema,
             errors=errors,
+            description_placeholders={"city": "Wpisz nazwę miasta (minimum 3 znaki) i wybierz z sugerowanych opcji."}
         )
 
-    async def async_step_user_dynamic(self, user_input=None):
-        """Dynamic loading for the city field based on the user's input."""
-        errors = {}
-        if user_input is not None:
-            city_name = user_input["city"]
-            if len(city_name) >= 3:
-                cities = await self._fetch_cities(city_name)
-                city_choices = [city["Name"] for city in cities]
-                # Update the form dynamically to show available cities
-                return self.async_show_form(
-                    step_id="user_dynamic",
-                    data_schema=vol.Schema({
-                        vol.Required("selected_city"): vol.In(city_choices),
-                    }),
-                    errors=errors,
-                )
-            else:
-                errors["city"] = "too_short"
+    @staticmethod
+    @callback
+    def async_register_websockets(hass):
+        """Register websockets for fetching dynamic city data."""
+        @websocket_api.websocket_command({
+            vol.Required("type"): "tauron/city_suggestions",
+            vol.Required("query"): cv.string,
+        })
+        @callback
+        async def handle_city_suggestions(hass, connection, msg):
+            """Handle city suggestions dynamically via websocket."""
+            query = msg.get("query")
+            if len(query) < 3:
+                connection.send_result(msg["id"], [])
+                return
 
-        return self.async_show_form(
-            step_id="user_dynamic",
-            data_schema=vol.Schema({
-                vol.Required("city"): str
-            }),
-            errors=errors,
-        )
+            cities = await hass.async_add_executor_job(self._fetch_cities, query)
+            suggestions = [city["Name"] for city in cities]
+            connection.send_result(msg["id"], suggestions)
+
+        websocket_api.async_register_command(hass, handle_city_suggestions)
