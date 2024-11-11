@@ -20,9 +20,6 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     """Handle a config flow for Tauron."""
     VERSION = 1
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_PUSH
-
-    
-        _LOGGER.debug("Entering _fetch_cities")
     async def _fetch_cities(self, city_name):
         """Fetch city list from Tauron API asynchronously."""
         _LOGGER.debug(f"_fetch_cities called with city_name: {city_name}")
@@ -40,9 +37,9 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         }
         _LOGGER.debug(f"Sending request to URL: {url}")
         _LOGGER.debug("Attempting to open a session to fetch cities")
-        try:
-            _LOGGER.debug("Creating aiohttp session")
-        async with aiohttp.ClientSession() as session:
+        
+        _LOGGER.debug("Creating aiohttp session")
+        
             _LOGGER.debug("Session created successfully, attempting request")
             try:
                 
@@ -55,7 +52,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                     data = await response.json()
                     _LOGGER.debug(f"Fetched cities data: {data}")  # Logowanie pełnej odpowiedzi
                     return data
-            except aiohttp.ClientError as ce:
+            
             _LOGGER.error(f"ClientError occurred: {ce}")
             return []
         except Exception as e:
@@ -64,6 +61,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
     async def async_step_user(self, user_input=None):
         """Handle the initial step of configuring the integration with dynamic suggestions."""
+
         _LOGGER.debug("async_step_user called")
         errors = {}
 
@@ -133,7 +131,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 return
 
             try:
-                flow = hass.config_entries.flow.async_get_handler("tauron_dystrybucja")
+                flow = hass.data.get("tauron_dystrybucja")
                 _LOGGER.debug(f"Attempting to fetch cities for query: {query}")
                 cities = await flow._fetch_cities(query)
                 if cities:
