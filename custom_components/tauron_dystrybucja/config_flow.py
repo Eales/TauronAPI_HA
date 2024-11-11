@@ -21,6 +21,10 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
     async def _fetch_cities(self, city_name):
         """Fetch city list from Tauron API asynchronously."""
+        if len(city_name) < 3:
+            _LOGGER.debug("City name too short, skipping API request.")
+            return []
+
         url = f"{API_BASE_URL}/enum/geo/cities?partName={city_name}"
         _LOGGER.debug(f"Fetching cities with partName: {city_name}")
         async with aiohttp.ClientSession() as session:
@@ -72,7 +76,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         data_schema = vol.Schema({
             vol.Required("city"): TextSelector(
                 TextSelectorConfig(
-                    type=TextSelectorType.SEARCH,
+                    type=TextSelectorType.TEXT,
                     placeholder="Wpisz nazwę miasta (minimum 3 znaki)",
                     autocomplete=True
                 )
@@ -103,8 +107,12 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 connection.send_result(msg["id"], [])
                 return
 
-            cities = hass.async_run_job(hass.data["tauron_config_flow"]._fetch_cities, query)
-            suggestions = [city["Name"] for city in cities]
+            cities = await hass.async_add_executor_job(hass.data["tauron_config_flow"]._fetch_cities, query)
+            if cities:
+                suggestions = [city["Name"] for city in cities]
+            else:
+                suggestions = []
+
             _LOGGER.debug(f"WebSocket suggestions: {suggestions}")
             connection.send_result(msg["id"], suggestions)
 
