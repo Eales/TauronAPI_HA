@@ -1,46 +1,94 @@
+import aiohttp
 import logging
-import requests
-from homeassistant.helpers.entity import Entity
-from datetime import datetime, timedelta
+from homeassistant import config_entries
+import voluptuous as vol
+from homeassistant.components import websocket_api
+from homeassistant.core import callback
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, SelectSelectorMode
 
 _LOGGER = logging.getLogger(__name__)
 
-class TauronOutageSensor(Entity):
-    """Representation of a Tauron outage sensor."""
+# Poprawiony adres URL do Tauron API
+API_BASE_URL = "https://www.tauron-dystrybucja.pl/waapi"
 
-    def __init__(self, name, city_gaid, street_gaid, house_no, flat_no, update_interval):
-        """Initialize the sensor."""
-        self._name = name
-        self._city_gaid = city_gaid
-        self._street_gaid = street_gaid
-        self._house_no = house_no
-        self._flat_no = flat_no
-        self._update_interval = update_interval
-        self._state = None
-        self._last_update = None
+class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
+    """Handle a config flow for Tauron."""
+    VERSION = 1
+    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_PUSH
 
-    @property
-    def name(self):
-        """Return the name of the sensor."""
-        return self._name
+    async def _fetch_cities(self, city_name):
+        """Fetch city list from Tauron API asynchronously."""
+        url = f"{API_BASE_URL}/enum/geo/cities?partName={city_name}"
+        async with aiohttp.ClientSession() as session:
+            try:
+                async with session.get(url) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+                    _LOGGER.debug(f"Fetched cities data: {data}")  # Logowanie odpowiedzi
+                    return data
+            except Exception as e:
+                _LOGGER.error(f"Error fetching cities: {e}")
+                return []
 
-    @property
-    def state(self):
-        """Return the state of the sensor."""
-        return self._state
+    async def async_step_user(self, user_input=None):
+        """Handle the initial step of configuring the integration with dynamic suggestions."""
+        errors = {}
+        city_suggestions = []
 
-    async def async_update(self):
-        """Fetch the latest data from Tauron API."""
-        now = datetime.utcnow()
-        if self._last_update is None or now - self._last_update > timedelta(minutes=self._update_interval):
-            url = f"https://www.tauron-dystrybucja.pl/waapi/outages/address?cityGAID={self._city_gaid}&streetGAID={self._street_gaid}&houseNo={self._house_no}&fromDate={now.isoformat()}&toDate={(now + timedelta(days=7)).isoformat()}&getLightingSupport=true&getServicedSwitchingoff=true"
-            response = requests.get(url)
-            if response.status_code == 200:
-                outages = response.json()
-                if outages:
-                    self._state = outages[0]["Name"]
-                else:
-                    self._state = "No outage"
-                self._last_update = now
+        if user_input is not None:
+            city_name = user_input.get("city")
+            if len(city_name) < 3:
+                errors["city"] = "too_short"
             else:
-                _LOGGER.error("Failed to fetch outage data")
+                cities = await self._fetch_cities(city_name)
+                if cities:
+                    city_suggestions = [city["Name"] for city in cities]
+                    if city_name in city_suggestions:
+                        selected_city = next((city for city in cities if city["Name"] == city_name), None)
+                        if selected_city:
+                            return self.async_create_entry(
+                                title=selected_city["Name"],
+                                data={"city": selected_city},
+                            )
+                else:
+                    errors["city"] = "invalid_city"
+
+        data_schema = vol.Schema({
+            vol.Required("city"): SelectSelector(
+                SelectSelectorConfig(
+                    options=city_suggestions,
+                    mode=SelectSelectorMode.DROPDOWN,
+                    translation_key="city_selector",
+                    description={"suggested_value": "Wpisz nazwę miasta (minimum 3 znaki) i wybierz z sugerowanych opcji."}
+                )
+            )
+        })
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=data_schema,
+            errors=errors,
+        )
+
+    @staticmethod
+    @callback
+    def async_register_websockets(hass):
+        """Register websockets for fetching dynamic city data."""
+        @websocket_api.websocket_command({
+            vol.Required("type"): "tauron/city_suggestions",
+            vol.Required("query"): cv.string,
+        })
+        @callback
+        async def handle_city_suggestions(hass, connection, msg):
+            """Handle city suggestions dynamically via websocket."""
+            query = msg.get("query")
+            if len(query) < 3:
+                connection.send_result(msg["id"], [])
+                return
+
+            cities = await hass.async_add_executor_job(self._fetch_cities, query)
+            suggestions = [city["Name"] for city in cities]
+            connection.send_result(msg["id"], suggestions)
+
+        websocket_api.async_register_command(hass, handle_city_suggestions)
