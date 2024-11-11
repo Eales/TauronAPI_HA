@@ -5,6 +5,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,6 +34,8 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     async def async_step_user(self, user_input=None):
         """Handle the initial step of configuring the integration with dynamic suggestions."""
         errors = {}
+        city_suggestions = []
+
         if user_input is not None:
             city_name = user_input.get("city")
             if len(city_name) < 3:
@@ -40,18 +43,25 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
             else:
                 cities = await self._fetch_cities(city_name)
                 if cities:
-                    selected_city_name = user_input.get("city")
-                    city_data = next((city for city in cities if city["Name"] == selected_city_name), None)
-                    if city_data:
-                        return self.async_create_entry(
-                            title=city_data["Name"],
-                            data=city_data,
-                        )
+                    city_suggestions = [city["Name"] for city in cities]
+                    if user_input.get("city") in city_suggestions:
+                        selected_city_name = user_input.get("city")
+                        city_data = next((city for city in cities if city["Name"] == selected_city_name), None)
+                        if city_data:
+                            return self.async_create_entry(
+                                title=city_data["Name"],
+                                data=city_data,
+                            )
                 else:
                     errors["city"] = "invalid_city"
 
         data_schema = vol.Schema({
-            vol.Required("city"): str,
+            vol.Required("city"): TextSelector(
+                TextSelectorConfig(
+                    type=TextSelectorType.SEARCH,
+                    autocomplete=lambda value: [city["Name"] for city in await self._fetch_cities(value) if len(value) >= 3]
+                )
+            ),
         })
 
         return self.async_show_form(
