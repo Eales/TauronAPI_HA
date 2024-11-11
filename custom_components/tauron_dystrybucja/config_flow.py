@@ -1,5 +1,6 @@
 import aiohttp
 import logging
+import urllib.parse
 from homeassistant import config_entries
 import voluptuous as vol
 from homeassistant.components import websocket_api
@@ -8,8 +9,9 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 # Ustawienie logowania na poziomie DEBUG
-logging.basicConfig(level=logging.DEBUG)
 _LOGGER = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
+_LOGGER.setLevel(logging.DEBUG)
 
 # Poprawiony adres URL do Tauron API
 API_BASE_URL = "https://www.tauron-dystrybucja.pl/waapi"
@@ -21,19 +23,22 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
     async def _fetch_cities(self, city_name):
         """Fetch city list from Tauron API asynchronously."""
+        _LOGGER.debug(f"_fetch_cities called with city_name: {city_name}")
         if len(city_name) < 3:
             _LOGGER.debug("City name too short, skipping API request.")
             return []
 
-        url = f"{API_BASE_URL}/enum/geo/cities?partName={city_name}"
-        _LOGGER.debug(f"Fetching cities with partName: {city_name}")
+        # Kodowanie partName w celu poprawnego formatowania URL
+        encoded_city_name = urllib.parse.quote(city_name)
+        url = f"{API_BASE_URL}/enum/geo/cities?partName={encoded_city_name}"
+        _LOGGER.debug(f"Fetching cities with partName: {encoded_city_name}")
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(url) as response:
                     _LOGGER.debug(f"Request URL: {url}, Status: {response.status}")
                     response.raise_for_status()
                     data = await response.json()
-                    _LOGGER.debug(f"Fetched cities data: {data}")  # Logowanie odpowiedzi
+                    _LOGGER.debug(f"Fetched cities data: {data}")  # Logowanie pełnej odpowiedzi
                     return data
             except Exception as e:
                 _LOGGER.error(f"Error fetching cities: {e}")
@@ -41,6 +46,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
     async def async_step_user(self, user_input=None):
         """Handle the initial step of configuring the integration with dynamic suggestions."""
+        _LOGGER.debug("async_step_user called")
         errors = {}
 
         if user_input is not None:
@@ -93,6 +99,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     @callback
     def async_register_websockets(hass):
         """Register websockets for fetching dynamic city data."""
+        _LOGGER.debug("Registering websockets for city suggestions")
         @websocket_api.websocket_command({
             vol.Required("type"): "tauron/city_suggestions",
             vol.Required("query"): cv.string,
@@ -109,6 +116,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
             try:
                 flow = hass.config_entries.flow.async_get_handler("tauron_dystrybucja")
+                _LOGGER.debug(f"Attempting to fetch cities for query: {query}")
                 cities = hass.async_run_job(flow._fetch_cities, query)
                 if cities:
                     suggestions = [city["Name"] for city in cities]
