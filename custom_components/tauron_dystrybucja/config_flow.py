@@ -48,26 +48,20 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 if cities:
                     city_suggestions = [city["Name"] for city in cities]
                     _LOGGER.info(f"City suggestions: {city_suggestions}")
-                    if city_name in city_suggestions:
-                        selected_city = next((city for city in cities if city["Name"] == city_name), None)
-                        if selected_city:
-                            _LOGGER.info(f"Selected city: {selected_city}")
-                            return self.async_create_entry(
-                                title=selected_city["Name"],
-                                data={"city": selected_city},
-                            )
+                    selected_city = next((city for city in cities if city["Name"] == city_name), None)
+                    if selected_city:
+                        _LOGGER.info(f"Selected city: {selected_city}")
+                        return self.async_create_entry(
+                            title=selected_city["Name"],
+                            data={"city": selected_city},
+                        )
                 else:
                     _LOGGER.warning("No valid cities found for the given input.")
                     errors["city"] = "invalid_city"
 
+        # W przypadku gdy user_input jest None (czyli początkowe wyświetlenie formularza)
         data_schema = vol.Schema({
-            vol.Required("city"): TextSelector(
-                TextSelectorConfig(
-                    type=TextSelectorType.SEARCH,
-                    placeholder="Wpisz nazwę miasta (minimum 3 znaki)",
-                    autocomplete=True
-                )
-            )
+            vol.Required("city"): str
         })
 
         return self.async_show_form(
