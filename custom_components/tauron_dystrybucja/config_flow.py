@@ -76,7 +76,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         data_schema = vol.Schema({
             vol.Required("city"): TextSelector(
                 TextSelectorConfig(
-                    type=TextSelectorType.SEARCH,
+                    type=TextSelectorType.TEXT,
                     placeholder="Wpisz nazwę miasta (minimum 3 znaki)",
                     autocomplete=True
                 )
@@ -108,7 +108,8 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 return
 
             try:
-                cities = await hass.async_add_executor_job(hass.config_entries.flow.async_get_handler("tauron_dystrybucja")._fetch_cities, query)
+                flow = hass.config_entries.flow.async_get_handler("tauron_dystrybucja")
+                cities = hass.async_run_job(flow._fetch_cities, query)
                 if cities:
                     suggestions = [city["Name"] for city in cities]
                 else:
