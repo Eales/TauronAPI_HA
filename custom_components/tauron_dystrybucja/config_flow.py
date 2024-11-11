@@ -20,9 +20,11 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     async def _fetch_cities(self, city_name):
         """Fetch city list from Tauron API asynchronously."""
         url = f"{API_BASE_URL}/enum/geo/cities?partName={city_name}"
+        _LOGGER.info(f"Fetching cities with partName: {city_name}")
         async with aiohttp.ClientSession() as session:
             try:
                 async with session.get(url) as response:
+                    _LOGGER.info(f"Request URL: {url}, Status: {response.status}")
                     response.raise_for_status()
                     data = await response.json()
                     _LOGGER.debug(f"Fetched cities data: {data}")  # Logowanie odpowiedzi
@@ -38,29 +40,34 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
         if user_input is not None:
             city_name = user_input.get("city")
+            _LOGGER.info(f"User input for city: {city_name}")
             if len(city_name) < 3:
+                _LOGGER.warning("City name too short, must be at least 3 characters.")
                 errors["city"] = "too_short"
             else:
                 cities = await self._fetch_cities(city_name)
                 if cities:
                     city_suggestions = [city["Name"] for city in cities]
+                    _LOGGER.info(f"City suggestions: {city_suggestions}")
                     if city_name in city_suggestions:
                         selected_city = next((city for city in cities if city["Name"] == city_name), None)
                         if selected_city:
+                            _LOGGER.info(f"Selected city: {selected_city}")
                             return self.async_create_entry(
                                 title=selected_city["Name"],
                                 data={"city": selected_city},
                             )
                 else:
+                    _LOGGER.warning("No valid cities found for the given input.")
                     errors["city"] = "invalid_city"
 
+        _LOGGER.debug(f"City suggestions for form: {city_suggestions}")
         data_schema = vol.Schema({
             vol.Required("city"): SelectSelector(
                 SelectSelectorConfig(
                     options=city_suggestions,
                     mode=SelectSelectorMode.DROPDOWN,
-                    translation_key="city_selector",
-                    description={"suggested_value": "Wpisz nazwę miasta (minimum 3 znaki) i wybierz z sugerowanych opcji."}
+                    translation_key="city_selector"
                 )
             )
         })
@@ -83,12 +90,15 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         async def handle_city_suggestions(hass, connection, msg):
             """Handle city suggestions dynamically via websocket."""
             query = msg.get("query")
+            _LOGGER.info(f"WebSocket received query: {query}")
             if len(query) < 3:
+                _LOGGER.warning("Query too short for suggestions, must be at least 3 characters.")
                 connection.send_result(msg["id"], [])
                 return
 
             cities = await hass.async_add_executor_job(self._fetch_cities, query)
             suggestions = [city["Name"] for city in cities]
+            _LOGGER.info(f"WebSocket suggestions: {suggestions}")
             connection.send_result(msg["id"], suggestions)
 
         websocket_api.async_register_command(hass, handle_city_suggestions)
