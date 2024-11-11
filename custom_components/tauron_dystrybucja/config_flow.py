@@ -5,7 +5,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import callback
 from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
+from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, SelectSelectorMode
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,8 +44,8 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 cities = await self._fetch_cities(city_name)
                 if cities:
                     city_suggestions = [city["Name"] for city in cities]
-                    if user_input.get("city") in city_suggestions:
-                        selected_city_name = user_input.get("city")
+                    if user_input.get("selected_city") in city_suggestions:
+                        selected_city_name = user_input.get("selected_city")
                         city_data = next((city for city in cities if city["Name"] == selected_city_name), None)
                         if city_data:
                             return self.async_create_entry(
@@ -56,12 +56,13 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                     errors["city"] = "invalid_city"
 
         data_schema = vol.Schema({
-            vol.Required("city"): TextSelector(
-                TextSelectorConfig(
-                    type=TextSelectorType.SEARCH,
-                    autocomplete=lambda value: [city["Name"] for city in await self._fetch_cities(value) if len(value) >= 3]
+            vol.Required("city"): str,
+            vol.Optional("selected_city"): SelectSelector(
+                SelectSelectorConfig(
+                    options=city_suggestions,
+                    mode=SelectSelectorMode.DROPDOWN
                 )
-            ),
+            )
         })
 
         return self.async_show_form(
