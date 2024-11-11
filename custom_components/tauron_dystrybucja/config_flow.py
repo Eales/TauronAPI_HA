@@ -76,7 +76,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         data_schema = vol.Schema({
             vol.Required("city"): TextSelector(
                 TextSelectorConfig(
-                    type=TextSelectorType.TEXT,
+                    type=TextSelectorType.SEARCH,
                     placeholder="Wpisz nazwę miasta (minimum 3 znaki)",
                     autocomplete=True
                 )
@@ -107,13 +107,16 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 connection.send_result(msg["id"], [])
                 return
 
-            cities = await hass.async_add_executor_job(hass.data["tauron_config_flow"]._fetch_cities, query)
-            if cities:
-                suggestions = [city["Name"] for city in cities]
-            else:
-                suggestions = []
-
-            _LOGGER.debug(f"WebSocket suggestions: {suggestions}")
-            connection.send_result(msg["id"], suggestions)
+            try:
+                cities = await hass.async_add_executor_job(hass.config_entries.flow.async_get_handler("tauron_dystrybucja")._fetch_cities, query)
+                if cities:
+                    suggestions = [city["Name"] for city in cities]
+                else:
+                    suggestions = []
+                _LOGGER.debug(f"WebSocket suggestions: {suggestions}")
+                connection.send_result(msg["id"], suggestions)
+            except Exception as e:
+                _LOGGER.error(f"Error in WebSocket suggestion handling: {e}")
+                connection.send_result(msg["id"], [])
 
         websocket_api.async_register_command(hass, handle_city_suggestions)
