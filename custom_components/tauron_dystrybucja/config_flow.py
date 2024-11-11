@@ -21,6 +21,8 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     VERSION = 1
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_PUSH
 
+    
+        _LOGGER.debug("Entering _fetch_cities")
     async def _fetch_cities(self, city_name):
         """Fetch city list from Tauron API asynchronously."""
         _LOGGER.debug(f"_fetch_cities called with city_name: {city_name}")
@@ -37,8 +39,14 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
             "Accept": "application/json"
         }
         _LOGGER.debug(f"Sending request to URL: {url}")
+        _LOGGER.debug("Attempting to open a session to fetch cities")
+        try:
+            _LOGGER.debug("Creating aiohttp session")
         async with aiohttp.ClientSession() as session:
+            _LOGGER.debug("Session created successfully, attempting request")
             try:
+                
+                _LOGGER.debug(f"Performing GET request to: {url} with headers: {headers}")
                 async with session.get(url, headers=headers) as response:
                     _LOGGER.debug(f"Request URL: {url}, Status: {response.status}")
                     if response.status == 400:
@@ -47,7 +55,10 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                     data = await response.json()
                     _LOGGER.debug(f"Fetched cities data: {data}")  # Logowanie pełnej odpowiedzi
                     return data
-            except Exception as e:
+            except aiohttp.ClientError as ce:
+            _LOGGER.error(f"ClientError occurred: {ce}")
+            return []
+        except Exception as e:
                 _LOGGER.error(f"Error fetching cities: {e}")
                 return []
 
