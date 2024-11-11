@@ -63,7 +63,12 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
         # W przypadku gdy user_input jest None (czyli początkowe wyświetlenie formularza)
         data_schema = vol.Schema({
-            vol.Required("city"): str
+            vol.Required("city"): TextSelector(
+                TextSelectorConfig(
+                    type=TextSelectorType.TEXT,
+                    placeholder="Wpisz nazwę miasta (minimum 3 znaki)"
+                )
+            )
         })
 
         return self.async_show_form(
@@ -90,7 +95,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 connection.send_result(msg["id"], [])
                 return
 
-            cities = await hass.async_add_executor_job(self._fetch_cities, query)
+            cities = hass.async_run_job(self._fetch_cities, query)
             suggestions = [city["Name"] for city in cities]
             _LOGGER.debug(f"WebSocket suggestions: {suggestions}")
             connection.send_result(msg["id"], suggestions)
