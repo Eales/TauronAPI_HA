@@ -28,8 +28,10 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 return []
 
     async def async_step_user(self, user_input=None):
-        """Handle the initial step of configuring the integration."""
+        """Handle the initial step of configuring the integration in a single step."""
         errors = {}
+        city_choices = {}
+
         if user_input is not None:
             # Sprawdzamy miasto, które użytkownik wpisał
             city_name = user_input["city"]
@@ -37,50 +39,31 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 errors["city"] = "too_short"
             else:
                 cities = await self._fetch_cities(city_name)
-
                 if cities:
-                    # Przechodzimy do kolejnego kroku wyboru miasta
-                    self.cities = cities  # Zapisz wyniki dla przyszłego użycia
-                    return await self.async_step_user_selected()
+                    city_choices = {city["Name"]: city["Name"] for city in cities}
+                    if user_input.get("selected_city") in city_choices:
+                        selected_city_name = user_input["selected_city"]
+                        city_data = next((city for city in cities if city["Name"] == selected_city_name), None)
+                        if city_data:
+                            # Zapisz dane miasta
+                            return self.async_create_entry(
+                                title=city_data["Name"],
+                                data=city_data,
+                            )
                 else:
                     errors["city"] = "invalid_city"
 
+        data_schema = vol.Schema({
+            vol.Required("city"): str
+        })
+
+        if city_choices:
+            data_schema = data_schema.extend({
+                vol.Required("selected_city"): vol.In(city_choices)
+            })
+
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required("city"): str,
-                }
-            ),
+            data_schema=data_schema,
             errors=errors,
-        )
-
-    async def async_step_user_selected(self, user_input=None):
-        """Handle the selection of the city from the list."""
-        if user_input is not None:
-            selected_city_name = user_input["selected_city"]
-            city_data = next(
-                (city for city in self.cities if city["Name"] == selected_city_name),
-                None
-            )
-            if city_data:
-                # Zapisz dane miasta
-                return self.async_create_entry(
-                    title=city_data["Name"],
-                    data=city_data,
-                )
-
-        # Tworzymy listę wyboru z zapisanych wcześniej miast
-        city_choices = {
-            city["Name"]: city["Name"] for city in getattr(self, 'cities', [])
-        }
-
-        return self.async_show_form(
-            step_id="user_selected",
-            data_schema=vol.Schema(
-                {
-                    vol.Required("selected_city"): vol.In(city_choices),
-                }
-            ),
-            errors={},
         )
