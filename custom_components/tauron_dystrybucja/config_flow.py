@@ -20,6 +20,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     """Handle a config flow for Tauron."""
     VERSION = 1
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_PUSH
+
     async def _fetch_cities(self, city_name):
         """Fetch city list from Tauron API asynchronously."""
         _LOGGER.debug(f"_fetch_cities called with city_name: {city_name}")
@@ -37,27 +38,27 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         }
         _LOGGER.debug(f"Sending request to URL: {url}")
         _LOGGER.debug("Attempting to open a session to fetch cities")
-        
-        _LOGGER.debug("Creating aiohttp session")
-        
-            _LOGGER.debug("Session created successfully, attempting request")
-            try:
-                
-                _LOGGER.debug(f"Performing GET request to: {url} with headers: {headers}")
-                async with session.get(url, headers=headers) as response:
-                    _LOGGER.debug(f"Request URL: {url}, Status: {response.status}")
-                    if response.status == 400:
-                        _LOGGER.error("Received 400 Bad Request from API. Please check the query parameters.")
-                    response.raise_for_status()
-                    data = await response.json()
-                    _LOGGER.debug(f"Fetched cities data: {data}")  # Logowanie pełnej odpowiedzi
-                    return data
-            
-            _LOGGER.error(f"ClientError occurred: {ce}")
-            return []
+
+        try:
+            _LOGGER.debug("Creating aiohttp session")
+            async with aiohttp.ClientSession() as session:
+                _LOGGER.debug("Session created successfully, attempting request")
+                try:
+                    _LOGGER.debug(f"Performing GET request to: {url} with headers: {headers}")
+                    async with session.get(url, headers=headers) as response:
+                        _LOGGER.debug(f"Request URL: {url}, Status: {response.status}")
+                        if response.status == 400:
+                            _LOGGER.error("Received 400 Bad Request from API. Please check the query parameters.")
+                        response.raise_for_status()
+                        data = await response.json()
+                        _LOGGER.debug(f"Fetched cities data: {data}")  # Logowanie pełnej odpowiedzi
+                        return data
+                except aiohttp.ClientError as ce:
+                    _LOGGER.error(f"ClientError occurred: {ce}")
+                    return []
         except Exception as e:
-                _LOGGER.error(f"Error fetching cities: {e}")
-                return []
+            _LOGGER.error(f"Error fetching cities: {e}")
+            return []
 
     async def async_step_user(self, user_input=None):
         """Handle the initial step of configuring the integration with dynamic suggestions."""
