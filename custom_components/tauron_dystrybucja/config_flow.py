@@ -53,9 +53,16 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                     selected_city = next((city for city in cities if city["Name"] == city_name), None)
                     if selected_city:
                         _LOGGER.debug(f"Selected city: {selected_city}")
+                        # Zapisujemy pełne dane miasta, w tym GUS
                         return self.async_create_entry(
                             title=selected_city["Name"],
-                            data={"city": selected_city},
+                            data={
+                                "city_name": selected_city["Name"],
+                                "gus": selected_city["GUS"],
+                                "district": selected_city["DistrictName"],
+                                "province": selected_city["ProvinceName"],
+                                "gaid": selected_city["GAID"]
+                            },
                         )
                 else:
                     _LOGGER.warning("No valid cities found for the given input.")
@@ -65,8 +72,9 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         data_schema = vol.Schema({
             vol.Required("city"): TextSelector(
                 TextSelectorConfig(
-                    type=TextSelectorType.TEXT,
-                    placeholder="Wpisz nazwę miasta (minimum 3 znaki)"
+                    type=TextSelectorType.SEARCH,
+                    placeholder="Wpisz nazwę miasta (minimum 3 znaki)",
+                    autocomplete=True
                 )
             )
         })
@@ -95,7 +103,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 connection.send_result(msg["id"], [])
                 return
 
-            cities = await hass.async_add_executor_job(hass.data["tauron_config_flow"]._fetch_cities, query)
+            cities = hass.async_run_job(hass.data["tauron_config_flow"]._fetch_cities, query)
             suggestions = [city["Name"] for city in cities]
             _LOGGER.debug(f"WebSocket suggestions: {suggestions}")
             connection.send_result(msg["id"], suggestions)
