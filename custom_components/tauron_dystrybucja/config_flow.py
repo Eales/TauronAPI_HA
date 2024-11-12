@@ -22,12 +22,11 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_PUSH
 
     
-        _LOGGER.debug("Entering _fetch_cities method.")
+        
     async def _fetch_cities(self, city_name):
         """Fetch city list from Tauron API asynchronously."""
         _LOGGER.debug(f"_fetch_cities called with city_name: {city_name}")
         _LOGGER.debug("Checking length of city_name.")
-        _LOGGER.debug("Validating city_name length in async_step_user.")
             if len(city_name) < 3:
             _LOGGER.debug("City name too short, skipping API request.")
             return []
@@ -47,10 +46,8 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         _LOGGER.debug(f"Sending request to URL: {url}")
         _LOGGER.debug("Attempting to open a session to fetch cities")
 
-        try:
-            _LOGGER.debug("Creating aiohttp session")
-            _LOGGER.debug("Opening aiohttp session.")
-        async with aiohttp.ClientSession() as session:
+        try:        _LOGGER.debug("Creating aiohttp session")
+            _LOGGER.debug("Opening aiohttp session.")        async with aiohttp.ClientSession() as session:
                 _LOGGER.debug("Session created successfully, attempting request")
                 try:
                     _LOGGER.debug(f"Performing GET request to: {url} with headers: {headers}")
@@ -128,12 +125,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
             step_id="user",
             data_schema=data_schema,
             errors=errors,
-        )
-
-    @staticmethod
-    @callback
-    def _LOGGER.debug("Registering websocket command.")
-        async_register_websockets(hass):
+        )    @staticmethod    async def async_register_websockets(hass):
         """Register websockets for fetching dynamic city data."""
         _LOGGER.debug("Registering websockets for city suggestions")
         @websocket_api.websocket_command({
@@ -144,8 +136,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         async def handle_city_suggestions(hass, connection, msg):
             """Handle city suggestions dynamically via websocket."""
             query = msg.get("query")
-            _LOGGER.debug(f"WebSocket received query: {query}")
-            if len(query) < 3:
+            _LOGGER.debug(f"WebSocket received query: {query}")            if len(query) < 3:
                 _LOGGER.warning("Query too short for suggestions, must be at least 3 characters.")
                 connection.send_result(msg["id"], [])
                 return
@@ -156,9 +147,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 _LOGGER.debug("Fetching cities dynamically via websocket.")
                 cities = await flow._fetch_cities(query)
                 _LOGGER.debug("Checking if cities were returned from websocket fetch.")
-                if cities:
-                                    suggestions = [city["Name"] for city in cities]
-                else:
+                if cities:                    suggestions = [city["Name"] for city in cities]                else:
                     suggestions = []
                 _LOGGER.debug(f"WebSocket suggestions: {suggestions}")
                 connection.send_result(msg["id"], suggestions)
