@@ -48,18 +48,18 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
             else:
                 city_choices = []  # Jeśli za mało znaków, lista pozostaje pusta
         
+        # Pozwalamy użytkownikowi wpisać cokolwiek, ale po wpisaniu 3 znaków oferujemy podpowiedzi
+        data_schema = vol.Schema(
+            {
+                vol.Required("city", default=city_name): str,
+            }
+        )
+
         if len(city_name) >= 3 and city_choices:
-            # Dodajemy listę wyboru, jeśli są dostępne miasta do wyboru
+            # Dodajemy listę wyboru jako podpowiedzi, ale pozwalamy na wpisywanie dowolnego tekstu
             data_schema = vol.Schema(
                 {
-                    vol.Required("city", default=city_name): vol.In(city_choices + [city_name]),
-                }
-            )
-        else:
-            # Pozwalamy użytkownikowi wpisać cokolwiek, ale nie pozwalamy na przejście dalej bez prawidłowego wyboru
-            data_schema = vol.Schema(
-                {
-                    vol.Required("city", default=city_name): str,
+                    vol.Required("city", default=city_name): vol.Any(vol.In(city_choices), str),
                 }
             )
 
