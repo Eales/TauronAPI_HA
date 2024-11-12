@@ -29,12 +29,13 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
             return []
 
         # Kodowanie partName w celu poprawnego formatowania URL
-        encoded_city_name = urllib.parse.quote(city_name)
+        encoded_city_name = urllib.parse.quote_plus(city_name)
         url = f"{API_BASE_URL}/enum/geo/cities?partName={encoded_city_name}"
         _LOGGER.debug(f"Fetching cities with partName: {encoded_city_name}")
         headers = {
             "User-Agent": "HomeAssistant",
-            "Accept": "application/json"
+            "Accept": "application/json",
+            "Content-Type": "application/json"
         }
         _LOGGER.debug(f"Sending request to URL: {url}")
         _LOGGER.debug("Attempting to open a session to fetch cities")
@@ -50,6 +51,8 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                         if response.status == 400:
                             _LOGGER.error("Received 400 Bad Request from API. Please check the query parameters.")
                         response.raise_for_status()
+                        response_text = await response.text()
+                        _LOGGER.debug(f"Response text: {response_text}")
                         data = await response.json()
                         _LOGGER.debug(f"Fetched cities data: {data}")  # Logowanie pełnej odpowiedzi
                         return data
