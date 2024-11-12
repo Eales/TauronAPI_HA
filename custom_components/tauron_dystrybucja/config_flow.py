@@ -49,17 +49,22 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 city_choices = []  # Jeśli za mało znaków, lista pozostaje pusta
         
         # Pozwalamy użytkownikowi wpisać cokolwiek, ale po wpisaniu 3 znaków oferujemy podpowiedzi
-        data_schema = vol.Schema(
-            {
-                vol.Required("city", default=city_name): str,
-            }
-        )
+        if len(city_name) >= 3:
+            if city_choices:
+                if city_name not in city_choices:
+                    city_choices.append(city_name)  # Dodajemy wpisane miasto do listy podpowiedzi, jeśli nie jest już dodane
+            else:
+                city_choices = [city_name]
 
-        if len(city_name) >= 3 and city_choices:
-            # Dodajemy listę wyboru jako podpowiedzi, ale pozwalamy na wpisywanie dowolnego tekstu
             data_schema = vol.Schema(
                 {
                     vol.Required("city", default=city_name): vol.Any(vol.In(city_choices), str),
+                }
+            )
+        else:
+            data_schema = vol.Schema(
+                {
+                    vol.Required("city", default=city_name): str,
                 }
             )
 
@@ -87,15 +92,8 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         city_data = next((city for city in cities if city["Name"] == selected_city_name), None)
 
         if not city_data:
-            return self.async_show_form(
-                step_id="user",
-                data_schema=vol.Schema(
-                    {
-                        vol.Required("city"): str,
-                    }
-                ),
-                errors={"city": "invalid_city"},
-            )
+            # Jeśli wybrano miasto, którego nie ma na liście, utwórzmy dane na podstawie wpisanego miasta
+            city_data = {"Name": selected_city_name}
 
         # Zapisz dane miasta
         return self.async_create_entry(
