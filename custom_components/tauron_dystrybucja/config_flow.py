@@ -9,11 +9,9 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 # Ustawienie logowania na poziomie DEBUG
-_LOGGER = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
-_LOGGER.setLevel(logging.DEBUG)
+_LOGGER = logging.getLogger(__name__)
 
-# Poprawiony adres URL do Tauron API
 API_BASE_URL = "https://www.tauron-dystrybucja.pl/waapi"
 
 class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
@@ -21,13 +19,11 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     VERSION = 1
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_PUSH
 
-    
-        
     async def _fetch_cities(self, city_name):
         """Fetch city list from Tauron API asynchronously."""
         _LOGGER.debug(f"_fetch_cities called with city_name: {city_name}")
         _LOGGER.debug("Checking length of city_name.")
-            if len(city_name) < 3:
+        if not city_name or len(city_name.strip()) < 3:
             _LOGGER.debug("City name too short, skipping API request.")
             return []
 
@@ -46,15 +42,14 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         _LOGGER.debug(f"Sending request to URL: {url}")
         _LOGGER.debug("Attempting to open a session to fetch cities")
 
-        try:        _LOGGER.debug("Creating aiohttp session")
-            _LOGGER.debug("Opening aiohttp session.")        async with aiohttp.ClientSession() as session:
+        try:
+            _LOGGER.debug("Creating aiohttp session")
+            async with aiohttp.ClientSession() as session:
                 _LOGGER.debug("Session created successfully, attempting request")
                 try:
                     _LOGGER.debug(f"Performing GET request to: {url} with headers: {headers}")
-                    _LOGGER.debug("Sending GET request to API.")
-                async with session.get(url, headers=headers) as response:
+                    async with session.get(url, headers=headers) as response:
                         _LOGGER.debug(f"Request URL: {url}, Status: {response.status}")
-                        _LOGGER.debug(f"Received response status: {response.status}")
                         if response.status == 400:
                             _LOGGER.error("Received 400 Bad Request from API. Please check the query parameters.")
                         response.raise_for_status()
@@ -71,18 +66,18 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
             _LOGGER.error(f"Error fetching cities: {e}")
             return []
 
-    _LOGGER.debug("Entering async_step_user method.")
     async def async_step_user(self, user_input=None):
         """Handle the initial step of configuring the integration with dynamic suggestions."""
 
         _LOGGER.debug("async_step_user called")
         errors = {}
 
-        _LOGGER.debug("User input received in async_step_user.")
         if user_input is not None:
             city_name = user_input.get("city")
-            _LOGGER.debug(f"User input for city: {city_name}")
-            if len(city_name) < 3:
+            if not city_name or len(city_name.strip()) == 0:
+                _LOGGER.warning("City name cannot be empty.")
+                errors["city"] = "empty_city"
+            elif len(city_name) < 3:
                 _LOGGER.warning("City name too short, must be at least 3 characters.")
                 errors["city"] = "too_short"
             else:
@@ -125,18 +120,23 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
             step_id="user",
             data_schema=data_schema,
             errors=errors,
-        )    @staticmethod    async def async_register_websockets(hass):
+        )
+
+    @staticmethod
+    @callback
+    async def async_register_websockets(hass):
         """Register websockets for fetching dynamic city data."""
         _LOGGER.debug("Registering websockets for city suggestions")
         @websocket_api.websocket_command({
-            vol.Required("type"): "tauron/city_suggestions",
+            vol.Required("type"): "tauron_dystrybucja/city_suggestions",
             vol.Required("query"): cv.string,
         })
         @callback
         async def handle_city_suggestions(hass, connection, msg):
             """Handle city suggestions dynamically via websocket."""
             query = msg.get("query")
-            _LOGGER.debug(f"WebSocket received query: {query}")            if len(query) < 3:
+            _LOGGER.debug(f"WebSocket received query: {query}")
+            if not query or len(query.strip()) < 3:
                 _LOGGER.warning("Query too short for suggestions, must be at least 3 characters.")
                 connection.send_result(msg["id"], [])
                 return
@@ -144,10 +144,11 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
             try:
                 flow = hass.data.get("tauron_dystrybucja")
                 _LOGGER.debug(f"Attempting to fetch cities for query: {query}")
-                _LOGGER.debug("Fetching cities dynamically via websocket.")
                 cities = await flow._fetch_cities(query)
                 _LOGGER.debug("Checking if cities were returned from websocket fetch.")
-                if cities:                    suggestions = [city["Name"] for city in cities]                else:
+                if cities:
+                    suggestions = [city["Name"] for city in cities]
+                else:
                     suggestions = []
                 _LOGGER.debug(f"WebSocket suggestions: {suggestions}")
                 connection.send_result(msg["id"], suggestions)
