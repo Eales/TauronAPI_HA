@@ -22,48 +22,37 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
     async def _fetch_cities(self, city_name):
         """Fetch city list from Tauron API asynchronously."""
         _LOGGER.debug(f"_fetch_cities called with city_name: {city_name}")
-        _LOGGER.debug("Checking length of city_name.")
         if not city_name or len(city_name.strip()) < 3:
             _LOGGER.debug("City name too short, skipping API request.")
             return []
 
-        # Kodowanie partName w celu poprawnego formatowania URL
-        _LOGGER.debug("Encoding city_name for URL.")
-        encoded_city_name = urllib.parse.quote_plus(city_name)
-        _LOGGER.debug("Constructing URL for API request.")
-        url = f"{API_BASE_URL}/enum/geo/cities?partName={encoded_city_name}"
-        _LOGGER.debug(f"Fetching cities with partName: {encoded_city_name}")
-        _LOGGER.debug("Setting up headers for API request.")
-        headers = {
-            "User-Agent": "HomeAssistant",
-            "Accept": "application/json",
-            "Content-Type": "application/json"
-        }
-        _LOGGER.debug(f"Sending request to URL: {url}")
-        _LOGGER.debug("Attempting to open a session to fetch cities")
-
         try:
-            _LOGGER.debug("Creating aiohttp session")
+            encoded_city_name = urllib.parse.quote_plus(city_name)
+            url = f"{API_BASE_URL}/enum/geo/cities?partName={encoded_city_name}"
+            headers = {
+                "User-Agent": "HomeAssistant",
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            }
+            _LOGGER.debug(f"Sending request to URL: {url} with headers: {headers}")
+
             async with aiohttp.ClientSession() as session:
-                _LOGGER.debug("Session created successfully, attempting request")
-                try:
-                    _LOGGER.debug(f"Performing GET request to: {url} with headers: {headers}")
-                    async with session.get(url, headers=headers) as response:
-                        _LOGGER.debug(f"Request URL: {url}, Status: {response.status}")
-                        if response.status == 400:
-                            _LOGGER.error("Received 400 Bad Request from API. Please check the query parameters.")
-                        response.raise_for_status()
-                        response_text = await response.text()
-                        _LOGGER.debug(f"Response text: {response_text}")
-                        _LOGGER.debug("Attempting to parse JSON response.")
-                        data = await response.json()
-                        _LOGGER.debug(f"Fetched cities data: {data}")  # Logowanie pełnej odpowiedzi
-                        return data
-                except aiohttp.ClientError as ce:
-                    _LOGGER.error(f"ClientError occurred: {ce}")
-                    return []
+                async with session.get(url, headers=headers) as response:
+                    _LOGGER.debug(f"Request URL: {url}, Status: {response.status}")
+                    if response.status == 400:
+                        _LOGGER.error("Received 400 Bad Request from API. Please check the query parameters.")
+                        return []
+                    response.raise_for_status()
+                    response_text = await response.text()
+                    _LOGGER.debug(f"Response text: {response_text}")
+                    data = await response.json()
+                    _LOGGER.debug(f"Fetched cities data: {data}")
+                    return data
+        except aiohttp.ClientError as ce:
+            _LOGGER.error(f"ClientError occurred: {ce}")
+            return []
         except Exception as e:
-            _LOGGER.error(f"Error fetching cities: {e}")
+            _LOGGER.error(f"Unexpected error occurred while fetching cities: {e}")
             return []
 
     async def async_step_user(self, user_input=None):
@@ -87,10 +76,9 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 if cities:
                     city_suggestions = [city["Name"] for city in cities]
                     _LOGGER.debug(f"City suggestions: {city_suggestions}")
-                    selected_city = next((city for city in cities if city["Name"] == city_name), None)
+                    selected_city = next((city for city in cities if city["Name"].lower() == city_name.lower()), None)
                     if selected_city:
                         _LOGGER.debug(f"Selected city: {selected_city}")
-                        # Zapisujemy pełne dane miasta, w tym GUS
                         return self.async_create_entry(
                             title=selected_city["Name"],
                             data={
@@ -101,11 +89,13 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                                 "gaid": selected_city["GAID"]
                             },
                         )
+                    else:
+                        _LOGGER.warning("No city matched exactly, please check the input.")
+                        errors["city"] = "no_match"
                 else:
                     _LOGGER.warning("No valid cities found for the given input.")
                     errors["city"] = "invalid_city"
 
-        # W przypadku gdy user_input jest None (czyli początkowe wyświetlenie formularza)
         data_schema = vol.Schema({
             vol.Required("city"): TextSelector(
                 TextSelectorConfig(
@@ -124,7 +114,7 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
     @staticmethod
     @callback
-    async def async_register_websockets(hass):
+    def async_register_websockets(hass):
         """Register websockets for fetching dynamic city data."""
         _LOGGER.debug("Registering websockets for city suggestions")
         @websocket_api.websocket_command({
@@ -141,11 +131,15 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 connection.send_result(msg["id"], [])
                 return
 
+            flow = hass.data.get("tauron_dystrybucja")
+            if not flow:
+                _LOGGER.error("Flow data not found in hass, unable to fetch city suggestions.")
+                connection.send_result(msg["id"], [])
+                return
+
             try:
-                flow = hass.data.get("tauron_dystrybucja")
                 _LOGGER.debug(f"Attempting to fetch cities for query: {query}")
                 cities = await flow._fetch_cities(query)
-                _LOGGER.debug("Checking if cities were returned from websocket fetch.")
                 if cities:
                     suggestions = [city["Name"] for city in cities]
                 else:
