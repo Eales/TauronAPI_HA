@@ -67,17 +67,17 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 ),
             )
 
-        # Zamiast automatycznie wybierać miasto, umożliwiamy użytkownikowi wybór z listy
+        # Zamiast automatycznie przechodzić do nowego kroku, umożliwiamy użytkownikowi wybór z listy w tym samym polu
         city_choices = {
             city["Name"]: city for city in cities  # Używamy nazwy miasta jako klucza do późniejszego zapisania danych
         }
 
-        # Jeśli mamy listę miast, użytkownik musi wybrać jedną z opcji
+        # Dodajemy pole, które dynamicznie aktualizuje podpowiedzi na podstawie wyników API
         return self.async_show_form(
-            step_id="user_selected",
+            step_id="user",
             data_schema=vol.Schema(
                 {
-                    vol.Required("selected_city"): vol.In(list(city_choices.keys())),  # Tworzymy pole z listą do wyboru
+                    vol.Required("city"): vol.In(list(city_choices.keys()) if len(city_choices) > 0 else [city_name]),  # Podpowiedzi dynamicznie aktualizowane po wpisaniu 3 znaków
                 }
             ),
             errors={},
@@ -85,24 +85,22 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
     async def async_step_user_selected(self, user_input):
         """Handle the selected city and save the chosen one."""
-        if not user_input or "selected_city" not in user_input:
+        selected_city_name = user_input["city"]
+        city_data = await self._fetch_cities(selected_city_name)
+
+        if not city_data:
             return self.async_show_form(
-                step_id="user_selected",
+                step_id="user",
+                errors={"city": "invalid_city"},
                 data_schema=vol.Schema(
                     {
-                        vol.Required("selected_city"): vol.In(list(city_choices.keys())),  # Użytkownik musi wybrać wartość z listy
+                        vol.Required("city"): str,
                     }
                 ),
-                errors={"selected_city": "selection_required"},
             )
-
-        selected_city_name = user_input["selected_city"]
-        city_data = {
-            city_name: data for city_name, data in city_choices.items() if city_name == selected_city_name
-        }[selected_city_name]
 
         # Zapisz dane miasta
         return self.async_create_entry(
-            title=city_data["Name"],  # Możesz zmienić to na jakąś preferowaną nazwę
-            data=city_data,  # Zapisujemy cały obiekt JSON z odpowiedzi
+            title=selected_city_name,  # Możesz zmienić to na jakąś preferowaną nazwę
+            data=city_data[0],  # Zapisujemy pierwszy dopasowany obiekt JSON z odpowiedzi
         )
