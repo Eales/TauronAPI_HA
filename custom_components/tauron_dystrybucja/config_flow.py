@@ -2,6 +2,7 @@ import aiohttp
 import logging
 from homeassistant import config_entries
 import voluptuous as vol
+from homeassistant.helpers.selector import selector
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,79 +29,55 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
 
     async def async_step_user(self, user_input=None):
         """Handle the initial step of configuring the integration."""
-        if user_input is None:
-            return self.async_show_form(
-                step_id="user",
-                data_schema=vol.Schema(
-                    {
-                        vol.Required("city"): str,
-                    }
-                ),
-                errors={},
-            )
+        errors = {}
 
-        # Sprawdzamy miasto, które użytkownik wpisał
-        city_name = user_input["city"]
-        if len(city_name) < 3:
-            # Jeśli wpisano mniej niż 3 znaki, zwracamy to, co użytkownik wpisał i nie wykonujemy zapytania do API
-            return self.async_show_form(
-                step_id="user",
-                errors={},
-                data_schema=vol.Schema(
-                    {
-                        vol.Required("city", default=city_name): str,
-                    }
-                ),
-            )
+        if user_input is not None:
+            # Sprawdzamy miasto, które użytkownik wpisał
+            city_name = user_input["city"]
+            if len(city_name) >= 3:
+                # Jeśli wpisano co najmniej 3 znaki, pobieramy listę miast
+                cities = await self._fetch_cities(city_name)
 
-        # Jeśli wpisano co najmniej 3 znaki, pobieramy listę miast
-        cities = await self._fetch_cities(city_name)
+                if cities:
+                    # Zapisujemy listę miast w zmiennej instancyjnej
+                    self.city_choices = {city["Name"]: city for city in cities}
+                else:
+                    errors["city"] = "invalid_city"
+            else:
+                self.city_choices = None
+        else:
+            self.city_choices = None
 
-        if not cities:
-            return self.async_show_form(
-                step_id="user",
-                errors={"city": "invalid_city"},
-                data_schema=vol.Schema(
-                    {
-                        vol.Required("city", default=city_name): str,
-                    }
-                ),
-            )
+        data_schema = vol.Schema(
+            {
+                vol.Required("city"): str if not self.city_choices else vol.In(list(self.city_choices.keys())),
+            }
+        )
 
-        # Zamiast automatycznie przechodzić do nowego kroku, umożliwiamy użytkownikowi wybór z listy w tym samym polu
-        city_choices = {
-            city["Name"]: city for city in cities  # Używamy nazwy miasta jako klucza do późniejszego zapisania danych
-        }
-
-        # Dodajemy pole, które dynamicznie aktualizuje podpowiedzi na podstawie wyników API
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required("city"): vol.In(list(city_choices.keys()) if len(city_choices) > 0 else [city_name]),  # Podpowiedzi dynamicznie aktualizowane po wpisaniu 3 znaków
-                }
-            ),
-            errors={},
+            data_schema=data_schema,
+            errors=errors,
         )
 
     async def async_step_user_selected(self, user_input):
         """Handle the selected city and save the chosen one."""
-        selected_city_name = user_input["city"]
-        city_data = await self._fetch_cities(selected_city_name)
-
-        if not city_data:
+        if not user_input or "city" not in user_input:
             return self.async_show_form(
                 step_id="user",
-                errors={"city": "invalid_city"},
                 data_schema=vol.Schema(
                     {
-                        vol.Required("city"): str,
+                        vol.Required("city"): vol.In(list(self.city_choices.keys())),  # Użytkownik musi wybrać wartość z listy
                     }
                 ),
+                errors={"city": "selection_required"},
             )
+
+        selected_city_name = user_input["city"]
+        city_data = self.city_choices[selected_city_name]
 
         # Zapisz dane miasta
         return self.async_create_entry(
             title=selected_city_name,  # Możesz zmienić to na jakąś preferowaną nazwę
-            data=city_data[0],  # Zapisujemy pierwszy dopasowany obiekt JSON z odpowiedzi
+            data=city_data,  # Zapisujemy cały obiekt JSON z odpowiedzi
         )
