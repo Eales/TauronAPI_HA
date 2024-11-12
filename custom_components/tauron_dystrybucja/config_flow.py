@@ -31,28 +31,37 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         """Handle the initial step of configuring the integration."""
         errors = {}
 
+        city_name = ""
+        city_choices = []
+
         if user_input is not None:
             # Sprawdzamy miasto, które użytkownik wpisał
-            city_name = user_input["city"]
+            city_name = user_input.get("city", "")
             if len(city_name) >= 3:
                 # Jeśli wpisano co najmniej 3 znaki, pobieramy listę miast
                 cities = await self._fetch_cities(city_name)
 
                 if cities:
-                    # Zapisujemy listę miast w zmiennej instancyjnej
-                    self.city_choices = {city["Name"]: city for city in cities}
+                    city_choices = [city["Name"] for city in cities]
                 else:
-                    errors["city"] = "invalid_city"
+                    city_choices = []  # Jeśli nie ma wyników, pozostawiamy listę pustą
             else:
-                self.city_choices = None
+                city_choices = []  # Jeśli za mało znaków, lista pozostaje pusta
+        
+        if len(city_name) >= 3 and city_choices:
+            # Dodajemy listę wyboru, jeśli są dostępne miasta do wyboru
+            data_schema = vol.Schema(
+                {
+                    vol.Required("city", default=city_name): vol.In(city_choices + [city_name]),
+                }
+            )
         else:
-            self.city_choices = None
-
-        data_schema = vol.Schema(
-            {
-                vol.Required("city"): str if not self.city_choices else vol.In(list(self.city_choices.keys())),
-            }
-        )
+            # Pozwalamy użytkownikowi wpisać cokolwiek, ale nie pozwalamy na przejście dalej bez prawidłowego wyboru
+            data_schema = vol.Schema(
+                {
+                    vol.Required("city", default=city_name): str,
+                }
+            )
 
         return self.async_show_form(
             step_id="user",
@@ -67,14 +76,26 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 step_id="user",
                 data_schema=vol.Schema(
                     {
-                        vol.Required("city"): vol.In(list(self.city_choices.keys())),  # Użytkownik musi wybrać wartość z listy
+                        vol.Required("city"): str,
                     }
                 ),
                 errors={"city": "selection_required"},
             )
 
         selected_city_name = user_input["city"]
-        city_data = self.city_choices[selected_city_name]
+        cities = await self._fetch_cities(selected_city_name)
+        city_data = next((city for city in cities if city["Name"] == selected_city_name), None)
+
+        if not city_data:
+            return self.async_show_form(
+                step_id="user",
+                data_schema=vol.Schema(
+                    {
+                        vol.Required("city"): str,
+                    }
+                ),
+                errors={"city": "invalid_city"},
+            )
 
         # Zapisz dane miasta
         return self.async_create_entry(
