@@ -35,7 +35,6 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
         """Handle the initial step of configuring the integration."""
         errors = {}
         city_name = ""
-        city_choices = []
 
         # Sprawdzanie wprowadzonego inputu
         if user_input is not None:
@@ -46,7 +45,8 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
                 if cities:
                     city_choices = [city["Name"] for city in cities]
                     # Przechodzimy do kroku wyboru z listy miast
-                    return await self.async_step_city_selection(city_choices, city_name)
+                    self.city_choices = city_choices  # Zapiszemy dostępne miasta, aby ułatwić powrót
+                    return await self.async_step_city_selection(user_input)
                 else:
                     errors["city"] = "no_cities_found"  # Jeśli brak wyników
             else:
@@ -65,40 +65,42 @@ class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
             errors=errors,
         )
 
-    async def async_step_city_selection(self, city_choices, default_city):
+    async def async_step_city_selection(self, user_input):
         """Handle the step where the user selects a city from the list."""
+        errors = {}
+
+        # Obsługa przycisku 'cofnij' - powrót do poprzedniego kroku
+        if user_input is not None:
+            selected_city = user_input.get("city")
+            if selected_city == "back":
+                return await self.async_step_user()
+
+            # Jeśli miasto zostało wybrane, kończymy proces wyboru
+            if selected_city in self.city_choices:
+                return await self.async_step_city_selection_complete(user_input)
+            else:
+                errors["city"] = "invalid_city_selection"
+
+        # Przycisk 'cofnij' dodawany do opcji wyboru
+        city_choices = self.city_choices + ["back"]
         data_schema = vol.Schema(
             {
-                vol.Required("city", default=default_city): vol.In(city_choices),
+                vol.Required("city"): vol.In(city_choices),
             }
         )
 
         return self.async_show_form(
             step_id="city_selection",
             data_schema=data_schema,
-            errors={},
+            errors=errors,
         )
 
-    async def async_step_city_selection_complete(self, user_input=None):
+    async def async_step_city_selection_complete(self, user_input):
         """Complete the city selection and create the entry."""
-        if user_input is None or "city" not in user_input:
-            return self.async_show_form(
-                step_id="city_selection",
-                data_schema=vol.Schema(
-                    {
-                        vol.Required("city"): str,
-                    }
-                ),
-                errors={"city": "selection_required"},
-            )
-
         selected_city_name = user_input["city"]
-        cities = await self._fetch_cities(selected_city_name)
-        city_data = next((city for city in cities if city["Name"] == selected_city_name), None)
 
-        if not city_data:
-            # Tworzymy dane na podstawie wprowadzonego miasta
-            city_data = {"Name": selected_city_name}
+        # Tworzymy dane na podstawie wprowadzonego miasta
+        city_data = {"Name": selected_city_name}
 
         # Tworzymy wpis konfiguracyjny
         return self.async_create_entry(
