@@ -5,105 +5,118 @@ import voluptuous as vol
 
 _LOGGER = logging.getLogger(__name__)
 
-API_BASE_URL = "https://www.tauron-dystrybucja.pl"  # Zaktualizowany URL bazowy
+API_BASE_URL = "https://www.tauron-dystrybucja.pl"
 
 class TauronConfigFlow(config_entries.ConfigFlow, domain="tauron_dystrybucja"):
-    """Handle a config flow for Tauron Dystrybucja."""
     VERSION = 1
-    CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_PUSH
+    CONNECTION_CLASS = config_entries.CONN_CLASS_CLOUD_POLL
 
-    async def _fetch_cities(self, city_name):
-        """Fetch city list from Tauron API asynchronously."""
-        url = f"{API_BASE_URL}/waapi/enum/geo/cities?partName={city_name}"
+    async def _fetch(self, endpoint, params):
+        url = f"{API_BASE_URL}{endpoint}"
         async with aiohttp.ClientSession() as session:
             try:
-                async with session.get(url) as response:
+                async with session.get(url, params=params) as response:
                     response.raise_for_status()
                     data = await response.json()
-                    if not isinstance(data, list):
-                        raise ValueError("Invalid response format")
-                    _LOGGER.debug(f"Fetched cities data: {data}")  # Logowanie odpowiedzi
-                    return data
+                    return data if isinstance(data, list) else []
             except aiohttp.ClientError as e:
-                _LOGGER.error(f"Client error fetching cities: {e}")
+                _LOGGER.error(f"Client error fetching data: {e}")
                 return []
             except Exception as e:
-                _LOGGER.error(f"Unexpected error fetching cities: {e}")
+                _LOGGER.error(f"Unexpected error fetching data: {e}")
                 return []
 
+    # Krok 1 - Miasto
     async def async_step_user(self, user_input=None):
-        """Handle the initial step of configuring the integration."""
         errors = {}
-        city_name = ""
-
-        # Sprawdzanie wprowadzonego inputu
-        if user_input is not None:
-            city_name = user_input.get("city", "")
-            if len(city_name) >= 3:
-                # Jeśli wpisano przynajmniej 3 znaki, pobieramy miasta
-                cities = await self._fetch_cities(city_name)
+        if user_input:
+            city_partial = user_input["city_partial"]
+            if len(city_partial) >= 3:
+                cities = await self._fetch("/waapi/enum/geo/cities", {"partName": city_partial})
                 if cities:
-                    city_choices = [city["Name"] for city in cities]
-                    # Przechodzimy do kroku wyboru z listy miast
-                    self.city_choices = city_choices  # Zapiszemy dostępne miasta, aby ułatwić powrót
-                    return await self.async_step_city_selection(user_input)
-                else:
-                    errors["city"] = "no_cities_found"  # Jeśli brak wyników
+                    self.city_choices = [city["Name"] for city in cities]
+                    return await self.async_step_city_selection()
+                errors["city_partial"] = "no_cities_found"
             else:
-                errors["city"] = "too_few_characters"  # Gdy za mało znaków
+                errors["city_partial"] = "too_few_characters"
 
-        # Schemat początkowy - wpisanie początkowych znaków miasta
-        data_schema = vol.Schema(
-            {
-                vol.Required("city", default=city_name): str,
-            }
-        )
+        schema = vol.Schema({
+            vol.Required("city_partial"): str
+        })
+        return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
-        return self.async_show_form(
-            step_id="user",
-            data_schema=data_schema,
-            errors=errors,
-        )
-
-    async def async_step_city_selection(self, user_input):
-        """Handle the step where the user selects a city from the list."""
+    async def async_step_city_selection(self, user_input=None):
         errors = {}
-
-        # Obsługa przycisku 'cofnij' - powrót do poprzedniego kroku
-        if user_input is not None:
-            selected_city = user_input.get("city")
+        if user_input:
+            selected_city = user_input["selected_city"]
             if selected_city == "back":
                 return await self.async_step_user()
-
-            # Jeśli miasto zostało wybrane, kończymy proces wyboru
             if selected_city in self.city_choices:
-                return await self.async_step_city_selection_complete(user_input)
+                self.selected_city = selected_city
+                return await self.async_step_street()
+            errors["selected_city"] = "invalid_city_selection"
+
+        schema = vol.Schema({
+            vol.Required("selected_city"): vol.In(self.city_choices + ["back"])
+        })
+        return self.async_show_form(step_id="city_selection", data_schema=schema, errors=errors)
+
+    # Krok 2 - Ulica
+    async def async_step_street(self, user_input=None):
+        errors = {}
+        if user_input:
+            street_partial = user_input["street_partial"]
+            if len(street_partial) >= 3:
+                streets = await self._fetch("/waapi/enum/geo/streets", {
+                    "cityName": self.selected_city,
+                    "partName": street_partial
+                })
+                if streets:
+                    self.street_choices = [street["Name"] for street in streets]
+                    return await self.async_step_street_selection()
+                errors["street_partial"] = "no_streets_found"
             else:
-                errors["city"] = "invalid_city_selection"
+                errors["street_partial"] = "too_few_characters"
 
-        # Przycisk 'cofnij' dodawany do opcji wyboru
-        city_choices = self.city_choices + ["back"]
-        data_schema = vol.Schema(
-            {
-                vol.Required("city"): vol.In(city_choices),
-            }
-        )
+        schema = vol.Schema({
+            vol.Required("street_partial"): str
+        })
+        return self.async_show_form(step_id="street", data_schema=schema, errors=errors)
 
-        return self.async_show_form(
-            step_id="city_selection",
-            data_schema=data_schema,
-            errors=errors,
-        )
+    async def async_step_street_selection(self, user_input=None):
+        errors = {}
+        if user_input:
+            selected_street = user_input["selected_street"]
+            if selected_street == "back":
+                return await self.async_step_street()
+            if selected_street in self.street_choices:
+                self.selected_street = selected_street
+                return await self.async_step_house_number()
+            errors["selected_street"] = "invalid_street_selection"
 
-    async def async_step_city_selection_complete(self, user_input):
-        """Complete the city selection and create the entry."""
-        selected_city_name = user_input["city"]
+        schema = vol.Schema({
+            vol.Required("selected_street"): vol.In(self.street_choices + ["back"])
+        })
+        return self.async_show_form(step_id="street_selection", data_schema=schema, errors=errors)
 
-        # Tworzymy dane na podstawie wprowadzonego miasta
-        city_data = {"Name": selected_city_name}
+    # Krok 3 - Numer domu
+    async def async_step_house_number(self, user_input=None):
+        errors = {}
+        if user_input:
+            house_number = user_input["house_number"]
+            if house_number:
+                # Wszystkie dane zebrane, tworzymy konfigurację!
+                return self.async_create_entry(
+                    title=f"{self.selected_city}, {self.selected_street} {house_number}",
+                    data={
+                        "city": self.selected_city,
+                        "street": self.selected_street,
+                        "house_number": house_number
+                    }
+                )
+            errors["house_number"] = "invalid_house_number"
 
-        # Tworzymy wpis konfiguracyjny
-        return self.async_create_entry(
-            title=selected_city_name,
-            data=city_data,
-        )
+        schema = vol.Schema({
+            vol.Required("house_number"): str
+        })
+        return self.async_show_form(step_id="house_number", data_schema=schema, errors=errors)
