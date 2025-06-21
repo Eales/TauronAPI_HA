@@ -18,3 +18,10 @@ This Home Assistant integration retrieves outage information from the Tauron Dys
 4. **Nr mieszkania** (Flat number, optional): Enter flat number if applicable.
 
 Once entered, the system will provide outage information for your location.
+
+### Troubleshooting
+
+If Home Assistant reports an error about `async_forward_entry_setup`,
+update the integration to the latest version. This release uses the
+`async_forward_entry_setups` API introduced in recent Home Assistant
+versions to forward your configuration to the sensor platform.
