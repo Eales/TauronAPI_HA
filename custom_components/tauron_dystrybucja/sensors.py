@@ -1,7 +1,10 @@
 import logging
+from datetime import datetime, timedelta
+
 import requests
 from homeassistant.helpers.entity import Entity
-from datetime import datetime, timedelta
+
+from . import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 class TauronOutageSensor(Entity):
     """Representation of a Tauron outage sensor."""
@@ -38,3 +41,17 @@ class TauronOutageSensor(Entity):
                 self._last_update = now
             else:
                 _LOGGER.error("Failed to fetch outage data")
+
+
+async def async_setup_entry(hass, entry, async_add_entities):
+    """Set up Tauron outage sensor from a config entry."""
+    data = hass.data[DOMAIN][entry.entry_id]
+    sensor = TauronOutageSensor(
+        "Tauron Outage",
+        data.get("city"),
+        data.get("street"),
+        data.get("house_number"),
+        data.get("flat_number"),
+        update_interval=30,
+    )
+    async_add_entities([sensor], True)
