@@ -2,10 +2,10 @@
   "domain": "tauron_dystrybucja",
   "name": "Tauron Dystrybucja",
   "documentation": "https://www.tauron-dystrybucja.pl",
-  "requirements": ["requests"],
+  "requirements": [],
   "dependencies": [],
   "codeowners": ["@Eales"],
-  "version": "1.0.1",
+  "version": "1.1.0",
   "config_flow": true,
   "iot_class": "cloud_polling"
 }
