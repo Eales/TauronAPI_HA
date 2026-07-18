@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-07-18
+
+Documentation only. The integration code is identical to 0.3.0.
+
+### Fixed
+
+- The installation section told users to search for the integration in HACS.
+  That does not work yet - the catalogue submission is still under review - so
+  it now describes adding the custom repository.
+- Entity IDs in the examples read as if they would match a real install. They
+  do not: Home Assistant derives them from the address and the interface
+  language. Every example now uses an obvious `REPLACE_ME` placeholder.
+
+### Added
+
+- A note explaining why an upgraded install keeps the original
+  `..._najblizsze_wylaczenie` ID even though the entity is now displayed as
+  `Początek wyłączenia`: Home Assistant assigns an entity ID once and never
+  rewrites it.
+- Minimum Home Assistant version, an attribute reference covering the
+  255-character state truncation, and the diagnostics download.
+
 ## [0.3.0] - 2026-07-18
 
 First stable release. Earlier 0.0.x and 0.1.x releases were unstable and have
@@ -46,4 +68,5 @@ Two behaviours worth knowing about, both found by testing against live data:
   so the description sensor truncates its state and keeps the complete text in
   the `full_description` attribute.
 
+[0.3.1]: https://github.com/Eales/tauron-dystrybucja/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Eales/tauron-dystrybucja/releases/tag/v0.3.0
