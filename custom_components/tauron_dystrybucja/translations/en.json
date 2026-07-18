@@ -1,0 +1,114 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Tauron Dystrybucja",
+        "description": "Enter at least 3 characters of the city name.",
+        "data": { "city_partial": "City" }
+      },
+      "city": {
+        "title": "Select city",
+        "data": { "city": "City" }
+      },
+      "street": {
+        "title": "Street",
+        "description": "Enter at least 3 characters of the street name in {city}.",
+        "data": { "street_partial": "Street" }
+      },
+      "street_selection": {
+        "title": "Select street",
+        "data": { "street": "Street" }
+      },
+      "house_number": {
+        "title": "House number",
+        "data": { "house_no": "House number" }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the Tauron Dystrybucja API.",
+      "too_few_characters": "Enter at least 3 characters.",
+      "no_cities_found": "No matching city found.",
+      "no_streets_found": "No matching street found in this city.",
+      "invalid_house_number": "Enter a house number."
+    },
+    "abort": {
+      "already_configured": "This address is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "description": "How often to poll the Tauron API. Planned outages are announced days in advance, so frequent polling gains nothing. Recommended: 60 minutes.",
+        "data": { "scan_interval": "Polling interval" }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "none": "No outages",
+          "upcoming": "Outage announced",
+          "ongoing": "Outage in progress"
+        }
+      },
+      "next_outage": {
+        "name": "Outage start",
+        "state_attributes": {
+          "start": { "name": "Start" },
+          "end": { "name": "End" },
+          "description": { "name": "Description" }
+        }
+      },
+      "next_outage_end": {
+        "name": "Outage end",
+        "state_attributes": {
+          "start": { "name": "Start" },
+          "end": { "name": "End" },
+          "description": { "name": "Description" }
+        }
+      },
+      "next_outage_duration": {
+        "name": "Duration",
+        "state_attributes": {
+          "start": { "name": "Start" },
+          "end": { "name": "End" },
+          "description": { "name": "Description" }
+        }
+      },
+      "next_outage_description": {
+        "name": "Outage description",
+        "state_attributes": {
+          "start": { "name": "Start" },
+          "end": { "name": "End" },
+          "description": { "name": "Description" },
+          "full_description": { "name": "Full description" }
+        }
+      },
+      "outage_count": {
+        "name": "Announced outages",
+        "state_attributes": {
+          "outages": { "name": "Outage list" }
+        }
+      }
+    },
+    "binary_sensor": {
+      "outage_active": { "name": "Outage in progress" }
+    },
+    "calendar": {
+      "outages": { "name": "Power outages" }
+    },
+    "event": {
+      "new_outage": {
+        "name": "New outage",
+        "state_attributes": {
+          "event_type": {
+            "state": { "new_outage": "Outage announced" }
+          }
+        }
+      }
+    }
+  }
+}

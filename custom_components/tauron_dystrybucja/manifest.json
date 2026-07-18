@@ -1,0 +1,13 @@
+{
+  "domain": "tauron_dystrybucja",
+  "name": "Tauron Dystrybucja",
+  "codeowners": ["@Eales"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/Eales/tauron-dystrybucja",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/Eales/tauron-dystrybucja/issues",
+  "requirements": [],
+  "version": "0.3.0"
+}

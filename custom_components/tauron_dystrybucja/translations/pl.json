@@ -1,0 +1,114 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Tauron Dystrybucja",
+        "description": "Podaj co najmniej 3 znaki nazwy miejscowości.",
+        "data": { "city_partial": "Miejscowość" }
+      },
+      "city": {
+        "title": "Wybierz miejscowość",
+        "data": { "city": "Miejscowość" }
+      },
+      "street": {
+        "title": "Ulica",
+        "description": "Podaj co najmniej 3 znaki nazwy ulicy w miejscowości {city}.",
+        "data": { "street_partial": "Ulica" }
+      },
+      "street_selection": {
+        "title": "Wybierz ulicę",
+        "data": { "street": "Ulica" }
+      },
+      "house_number": {
+        "title": "Numer domu",
+        "data": { "house_no": "Numer domu" }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nie można połączyć się z API Tauron Dystrybucja.",
+      "too_few_characters": "Podaj co najmniej 3 znaki.",
+      "no_cities_found": "Nie znaleziono pasującej miejscowości.",
+      "no_streets_found": "Nie znaleziono pasującej ulicy w tej miejscowości.",
+      "invalid_house_number": "Podaj numer domu."
+    },
+    "abort": {
+      "already_configured": "Ten adres jest już skonfigurowany."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcje",
+        "description": "Jak często sprawdzać API Tauronu. Wyłączenia planowane są ogłaszane z kilkudniowym wyprzedzeniem, więc częste odpytywanie nic nie daje. Zalecane: 60 minut.",
+        "data": { "scan_interval": "Częstotliwość odpytywania" }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "status": {
+        "name": "Status",
+        "state": {
+          "none": "Brak wyłączeń",
+          "upcoming": "Zapowiedziane wyłączenie",
+          "ongoing": "Trwa wyłączenie"
+        }
+      },
+      "next_outage": {
+        "name": "Początek wyłączenia",
+        "state_attributes": {
+          "start": { "name": "Początek" },
+          "end": { "name": "Koniec" },
+          "description": { "name": "Opis" }
+        }
+      },
+      "next_outage_end": {
+        "name": "Koniec wyłączenia",
+        "state_attributes": {
+          "start": { "name": "Początek" },
+          "end": { "name": "Koniec" },
+          "description": { "name": "Opis" }
+        }
+      },
+      "next_outage_duration": {
+        "name": "Czas trwania",
+        "state_attributes": {
+          "start": { "name": "Początek" },
+          "end": { "name": "Koniec" },
+          "description": { "name": "Opis" }
+        }
+      },
+      "next_outage_description": {
+        "name": "Opis wyłączenia",
+        "state_attributes": {
+          "start": { "name": "Początek" },
+          "end": { "name": "Koniec" },
+          "description": { "name": "Opis" },
+          "full_description": { "name": "Pełny opis" }
+        }
+      },
+      "outage_count": {
+        "name": "Zapowiedziane wyłączenia",
+        "state_attributes": {
+          "outages": { "name": "Lista wyłączeń" }
+        }
+      }
+    },
+    "binary_sensor": {
+      "outage_active": { "name": "Trwa wyłączenie" }
+    },
+    "calendar": {
+      "outages": { "name": "Wyłączenia prądu" }
+    },
+    "event": {
+      "new_outage": {
+        "name": "Nowe wyłączenie",
+        "state_attributes": {
+          "event_type": {
+            "state": { "new_outage": "Zapowiedziano wyłączenie" }
+          }
+        }
+      }
+    }
+  }
+}
